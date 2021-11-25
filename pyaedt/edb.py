@@ -1298,3 +1298,34 @@ class Edb(object):
         """
         bbox = self.edbutils.HfssUtilities.GetBBox(self.active_layout)
         return [[bbox.Item1.X.ToDouble(), bbox.Item1.Y.ToDouble()], [bbox.Item2.X.ToDouble(), bbox.Item2.Y.ToDouble()]]
+
+    @aedt_exception_handler
+    def get_cell(self, cell_name):
+        """Get a Cell object.
+
+        Parameters
+        ----------
+        cell_name
+
+        Returns
+        -------
+
+        """
+        for cell in list(self._db.TopCircuitCells):
+            if cell.GetName() == cell_name:
+                return cell
+        return False
+
+    @property
+    def cell_names(self):
+        """
+        Returns
+        -------
+        list of str
+            List of Cell names.
+        """
+
+        names = []
+        for cell in list(self._db.TopCircuitCells):
+            names.append(cell.GetName())
+        return names

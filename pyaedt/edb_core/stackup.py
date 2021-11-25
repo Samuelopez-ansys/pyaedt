@@ -292,8 +292,13 @@ class EdbStackup(object):
                 cell_inst2 = self._edb.Cell.Hierarchy.CellInstance.Create(edb_cell.GetLayout(), edb_cell.GetName() + "_Transform",
                                                                       self._active_layout)
             else:
-                cell_inst2 = self._edb.Cell.Hierarchy.CellInstance.Create(self._active_layout,
-                                                                          edb_cell.GetLayout().GetCell().GetName(), edb_cell.GetLayout())
+                if edb_cell.GetName() not in self._pedb.cell_names:
+                    _dbCell = convert_py_list_to_net_list([edb_cell])
+                    self._pedb.db.CopyCells(_dbCell)
+                    self._pedb.db.Save()
+                    edb_cell = self._pedb.get_cell(edb_cell.GetName())
+                cell_inst2 = self._edb.Cell.Hierarchy.CellInstance.Create(edb_cell.GetLayout(),
+                                                                          self._active_layout.GetCell().GetName(), self._active_layout)
             cell_trans = cell_inst2.GetTransform()
             cell_trans.SetRotationValue(_angle)
             cell_trans.SetXOffsetValue(_offset_x)
