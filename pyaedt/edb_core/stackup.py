@@ -8,7 +8,7 @@ import math
 import warnings
 
 from pyaedt.edb_core.EDB_Data import EDBLayers
-from pyaedt.edb_core.general import convert_py_list_to_net_list
+from pyaedt.edb_core.general import convert_py_list_to_net_list, convert_net_list_to_py_list
 from pyaedt.generic.general_methods import aedt_exception_handler, is_ironpython
 
 try:
@@ -221,7 +221,8 @@ class EdbStackup(object):
         return self._add_dielectric_material_model(name, material_def)
 
     @aedt_exception_handler
-    def flip_stackup_and_apply_transform(self, edb_cell=None, angle=0.0, offset_x=0.0, offset_y=0.0, mirror=True):
+    def flip_stackup_and_apply_transform(self, edb_cell=None, angle=0.0, offset_x=0.0, offset_y=0.0, mirror=True,
+                                         place_on_top=True):
         """Flip the current layer stackup of a layout. Transform parameters currently not supported.
 
         Parameters
@@ -286,25 +287,73 @@ class EdbStackup(object):
             edb_was_none = False
             if edb_cell is None:
                 cell_name = self._active_layout.GetCell().GetName()
-                self._active_layout.GetCell().SetName(cell_name+"_Transform")
+                self._active_layout.GetCell().SetName(cell_name + "_Transform")
                 edb_cell = self._edb.Cell.Cell.Create(self._db, self._edb.Cell.CellType.CircuitCell, cell_name)
                 edb_was_none = True
-                cell_inst2 = self._edb.Cell.Hierarchy.CellInstance.Create(edb_cell.GetLayout(), edb_cell.GetName() + "_Transform",
-                                                                      self._active_layout)
+                cell_inst2 = self._edb.Cell.Hierarchy.CellInstance.Create(edb_cell.GetLayout(),
+                                                                          edb_cell.GetName() + "_Transform",
+                                                                          self._active_layout)
             else:
                 if edb_cell.GetName() not in self._pedb.cell_names:
                     _dbCell = convert_py_list_to_net_list([edb_cell])
-                    self._pedb.db.CopyCells(_dbCell)
-                    self._pedb.db.Save()
-                    edb_cell = self._pedb.get_cell(edb_cell.GetName())
+                    list_cells = self._pedb.db.CopyCells(_dbCell)
+                    edb_cell = list_cells[0]
                 cell_inst2 = self._edb.Cell.Hierarchy.CellInstance.Create(edb_cell.GetLayout(),
-                                                                          self._active_layout.GetCell().GetName(), self._active_layout)
+                                                                          self._active_layout.GetCell().GetName(),
+                                                                          self._active_layout)
             cell_trans = cell_inst2.GetTransform()
             cell_trans.SetRotationValue(_angle)
             cell_trans.SetXOffsetValue(_offset_x)
             cell_trans.SetYOffsetValue(_offset_y)
             cell_trans.SetMirror(mirror)
             cell_inst2.SetTransform(cell_trans)
+            stackup_target = edb_cell.GetLayout().GetLayerCollection()
+            stackup_source = self._active_layout.GetLayerCollection()
+            if place_on_top:
+                cell_inst2.SetPlacementLayer(list(stackup_target.Layers(self._edb.Cell.LayerTypeSet.SignalLayerSet))[0])
+            else:
+                cell_inst2.SetPlacementLayer(list(stackup_target.Layers(self._edb.Cell.LayerTypeSet.SignalLayerSet))[-1])
+
+            cell_inst2.SetIs3DPlacement(True)
+            input_layers = self._edb.Cell.LayerTypeSet.SignalLayerSet
+            if is_ironpython:
+                res, topl, topz, bottoml, bottomz = stackup_target.GetTopBottomStackupLayers(input_layers)
+                res_s, topl_s, topz_s, bottoml_s, bottomz_s = stackup_source.GetTopBottomStackupLayers(input_layers)
+            else:
+                topl = None
+                topz = Double(0.0)
+                bottoml = None
+                bottomz = Double(0.0)
+                topl_s = None
+                topz_s = Double(0.0)
+                bottoml_s = None
+                bottomz_s = Double(0.0)
+                res, topl, topz, bottoml, bottomz = stackup_target.GetTopBottomStackupLayers(
+                    input_layers, topl, topz, bottoml, bottomz
+                )
+                res_s, topl_s, topz_s, bottoml_s, bottomz_s = stackup_source.GetTopBottomStackupLayers(
+                    input_layers, topl_s, topz_s, bottoml_s, bottomz_s
+                )
+            if place_on_top:
+                h_stackup = self._edb_value(topz)
+                if not mirror:
+                    h_stackup_s = self._edb_value(topz_s)
+                else:
+                    h_stackup_s = self._edb_value(bottomz_s)
+
+            else:
+                h_stackup = self._edb_value(bottomz)
+                if mirror:
+                    h_stackup_s = self._edb_value(topz_s)
+                else:
+                    h_stackup_s = self._edb_value(bottomz_s)
+            zero_data = self._edb_value(0.0)
+            one_data = self._edb_value(1.0)
+            point3d_t = self._edb.Geometry.Point3DData(_offset_x, _offset_y, h_stackup)
+            point3d_s = self._edb.Geometry.Point3DData(zero_data, zero_data, h_stackup_s)
+            point3d2 = self._edb.Geometry.Point3DData(zero_data, zero_data, zero_data)
+            point3d3 = self._edb.Geometry.Point3DData(zero_data, zero_data, one_data)
+            cell_inst2.Set3DTransformation(point3d_s, point3d2, point3d3, _angle, point3d_t)
             if edb_was_none:
                 edb_cell.GetLayout().SetLayerCollection(self._active_layout.GetLayerCollection())
             return True
