@@ -511,17 +511,6 @@ class Components(object):
 
     @aedt_exception_handler
     def _create_terminal(self, pin):
-        """Create terminal on component pin.
-
-        Parameters
-        ----------
-        pin : Edb padstack instance.
-
-        Returns
-        -------
-        Edb terminal.
-        """
-
         pin_pos = self._edb.Definition.Geometry.PointData()
         pin_rot = 0.0
         from_layer = self._edb.Cell.ILayerReadOnly
@@ -535,19 +524,6 @@ class Components(object):
 
     @aedt_exception_handler
     def _get_closest_pin_from(self, pin, ref_pinlist):
-        """Returns the closest pin from given pin among the list of reference pins.
-
-        Parameters
-        ----------
-        pin : Edb padstack instance.
-
-        ref_pinlist : list of reference edb pins.
-
-        Returns
-        -------
-        Edb pin.
-
-        """
         pin_position = self._edb.Geometry.PointData()
         pin_rot = 0.0
         pin.GetPositionAndRotation(pin_position, pin_rot)
@@ -566,19 +542,6 @@ class Components(object):
 
     @aedt_exception_handler
     def _create_pin_group_terminal(self, pingroup, isref=False):
-        """Creates edb pin group terminal from given edb pin group.
-
-        Parameters
-        ----------
-        pingroup : Edb pin group.
-
-        isref : bool
-
-        Returns
-        -------
-        Edb pin group terminal.
-        """
-
         layout = pingroup.GetLayout()
         cmp_name = pingroup.GetComponent().GetName()
         net_name = pingroup.GetNet().GetName()
@@ -648,20 +611,6 @@ class Components(object):
 
     @aedt_exception_handler
     def _is_top_component(self, cmp):
-        """Test the component placment layer.
-
-        Parameters
-        ----------
-        cmp : self._edb.Cell.Hierarchy.Component
-             Edb component.
-
-        Returns
-        -------
-        bool
-            ``True`` when component placed on top layer, ``False`` on bottom layer.
-
-
-        """
         signal_layers = cmp.GetLayout().GetLayerCollection().Layers(self._edb.Cell.LayerTypeSet.SignalLayerSet)
         if cmp.GetPlacementLayer() == signal_layers[0]:
             return True
@@ -1180,14 +1129,6 @@ class Components(object):
         if netName:
             if not isinstance(netName, list):
                 netName = [netName]
-            # pins = []
-            # cmp_obj = list(cmp.LayoutObjs)
-            # for p in cmp_obj:
-            #    if p.GetObjType() == 1:
-            #        if p.IsLayoutPin():
-            #            pin_net_name = p.GetNet().GetName()
-            #            if pin_net_name in netName:
-            #                pins.append(p)
             pins = [
                 p
                 for p in list(cmp.LayoutObjs)
