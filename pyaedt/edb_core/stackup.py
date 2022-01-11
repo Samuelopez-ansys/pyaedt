@@ -222,7 +222,7 @@ class EdbStackup(object):
 
     @aedt_exception_handler
     def flip_stackup_and_apply_transform(self, edb_cell=None, angle=0.0, offset_x=0.0, offset_y=0.0, mirror=True,
-                                         place_on_top=True):
+                                         place_on_top=True, solder_height=0):
         """Flip the current layer stackup of a layout. Transform parameters currently not supported.
 
         Parameters
@@ -301,14 +301,17 @@ class EdbStackup(object):
                 cell_inst2 = self._edb.Cell.Hierarchy.CellInstance.Create(edb_cell.GetLayout(),
                                                                           self._active_layout.GetCell().GetName(),
                                                                           self._active_layout)
+
             cell_trans = cell_inst2.GetTransform()
             cell_trans.SetRotationValue(_angle)
             cell_trans.SetXOffsetValue(_offset_x)
             cell_trans.SetYOffsetValue(_offset_y)
             cell_trans.SetMirror(mirror)
             cell_inst2.SetTransform(cell_trans)
+            cell_inst2.SetSolveIndependentPreference(True)
             stackup_target = edb_cell.GetLayout().GetLayerCollection()
             stackup_source = self._active_layout.GetLayerCollection()
+
             if place_on_top:
                 cell_inst2.SetPlacementLayer(list(stackup_target.Layers(self._edb.Cell.LayerTypeSet.SignalLayerSet))[0])
             else:
@@ -335,25 +338,18 @@ class EdbStackup(object):
                     input_layers, topl_s, topz_s, bottoml_s, bottomz_s
                 )
             if place_on_top:
-                h_stackup = self._edb_value(topz)
-                if not mirror:
-                    h_stackup_s = self._edb_value(topz_s)
-                else:
-                    h_stackup_s = self._edb_value(bottomz_s)
-
+                h_stackup = self._edb_value(topz+solder_height-bottomz_s)
             else:
-                h_stackup = self._edb_value(bottomz)
-                if mirror:
-                    h_stackup_s = self._edb_value(topz_s)
-                else:
-                    h_stackup_s = self._edb_value(bottomz_s)
+                h_stackup = self._edb_value(bottomz-solder_height-topz_s)
+
             zero_data = self._edb_value(0.0)
             one_data = self._edb_value(1.0)
             point3d_t = self._edb.Geometry.Point3DData(_offset_x, _offset_y, h_stackup)
-            point3d_s = self._edb.Geometry.Point3DData(zero_data, zero_data, h_stackup_s)
-            point3d2 = self._edb.Geometry.Point3DData(zero_data, zero_data, zero_data)
-            point3d3 = self._edb.Geometry.Point3DData(zero_data, zero_data, one_data)
-            cell_inst2.Set3DTransformation(point3d_s, point3d2, point3d3, _angle, point3d_t)
+            point_loc = self._edb.Geometry.Point3DData(zero_data, zero_data, zero_data)
+            point_from = self._edb.Geometry.Point3DData(zero_data, zero_data, one_data)
+            point_to = self._edb.Geometry.Point3DData(zero_data, zero_data, one_data)
+
+            cell_inst2.Set3DTransformation(point_loc, point_from, point_to, _angle, point3d_t)
             if edb_was_none:
                 edb_cell.GetLayout().SetLayerCollection(self._active_layout.GetLayerCollection())
             return True
